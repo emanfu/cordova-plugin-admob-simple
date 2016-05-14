@@ -67,6 +67,7 @@
 
 @property (nonatomic, retain) NSDictionary* adExtras;
 
+@property (nonatomic, retain) NSDictionary* location;
 
 
 @property (assign) BOOL bannerIsVisible;
