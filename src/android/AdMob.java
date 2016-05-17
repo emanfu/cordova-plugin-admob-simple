@@ -349,7 +349,7 @@ public class AdMob extends CordovaPlugin {
     private PluginResult executeRequestInterstitialAd(JSONObject options, CallbackContext callbackContext) {
         this.setOptions( options );
 
-        if(adView == null) {
+        if(interstitialAd == null) {
             callbackContext.error("interstitialAd is null, call createInterstitialView first");
             return null;
         }
@@ -509,7 +509,7 @@ public class AdMob extends CordovaPlugin {
     private class BannerListener extends BasicListener {
         @Override
         public void onAdLoaded() {
-            Log.w("AdMob", "BannerAdLoaded");
+            Log.w("AdMob", "BannerAdLoaded, network classname=" + adView.getMediationAdapterClassName());
             webView.loadUrl("javascript:cordova.fireDocumentEvent('onReceiveAd');");
         }
 
