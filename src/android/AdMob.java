@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
+import com.google.ads.mediation.flurry.FlurryAdapter;
 import com.google.android.gms.ads.*;
 import com.google.android.gms.ads.mediation.admob.AdMobExtras;
 import com.google.android.gms.common.ConnectionResult;
@@ -179,9 +180,7 @@ public class AdMob extends CordovaPlugin {
      * view action on the UI thread.  If this request is successful, the developer
      * should make the requestAd call to request an ad for the banner.
      *
-     * @param inputs The JSONArray representing input parameters.  This function
-     *        expects the first object in the array to be a JSONObject with the
-     *        input parameters.
+     * @param options The JSONObject carrying options for the banner.
      * @return A PluginResult representing whether or not the banner was created
      *         successfully.
      */
@@ -204,14 +203,14 @@ public class AdMob extends CordovaPlugin {
                     adView = new AdView(cordova.getActivity());
                     adView.setAdUnitId(publisherId);
                     adView.setAdSize(adSize);
-                    adView.setAdListener(new BannerListener());
+                    adView.setAdListener(new BannerListener(adView));
                 }
                 if (adView.getParent() != null) {
                     ((ViewGroup)adView.getParent()).removeView(adView);
                 }
 
                 bannerVisible = false;
-                adView.loadAd( buildAdRequest() );
+                adView.loadAd(buildAdRequest());
 
                 //if(autoShowBanner) {
                     executeShowAd(true, null);
@@ -254,14 +253,12 @@ public class AdMob extends CordovaPlugin {
      * view action on the UI thread.  If this request is successful, the developer
      * should make the requestAd call to request an ad for the banner.
      *
-     * @param inputs The JSONArray representing input parameters.  This function
-     *        expects the first object in the array to be a JSONObject with the
-     *        input parameters.
+     * @param options The JSONObject carrying options for the interstitial.
      * @return A PluginResult representing whether or not the banner was created
      *         successfully.
      */
     private PluginResult executeCreateInterstitialView(JSONObject options, CallbackContext callbackContext) {
-        this.setOptions( options );
+        this.setOptions(options);
         autoShowInterstitial = autoShow;
 
         if(this.interstialAdId.length() == 0 ) this.interstialAdId = getTempInterstitial();	//in case the user does not enter their own publisher id
@@ -276,7 +273,7 @@ public class AdMob extends CordovaPlugin {
             public void run() {
                 interstitialAd = new InterstitialAd(cordova.getActivity());
                 interstitialAd.setAdUnitId(interstialAdId);
-                interstitialAd.setAdListener(new InterstitialListener());
+                interstitialAd.setAdListener(new InterstitialListener(interstitialAd));
                 Log.w("interstitial", interstialAdId);
                 interstitialAd.loadAd( buildAdRequest() );
                 delayCallback.success();
@@ -296,6 +293,7 @@ public class AdMob extends CordovaPlugin {
 
         Bundle bundle = new Bundle();
         bundle.putInt("cordova", 1);
+        //bundle.putBoolean(FlurryAdapter.SERVER_PARAM_LOG_ENABLED, true);
         if(adExtras != null) {
             Iterator<String> it = adExtras.keys();
             while (it.hasNext()) {
@@ -309,6 +307,8 @@ public class AdMob extends CordovaPlugin {
         }
         AdMobExtras adextras = new AdMobExtras(bundle);
         request_builder = request_builder.addNetworkExtras( adextras );
+        //request_builder.addNetworkExtrasBundle(FlurryAdapter.class, bundle);
+
         AdRequest request = request_builder.build();
 
         return request;
@@ -318,9 +318,7 @@ public class AdMob extends CordovaPlugin {
      * Parses the request ad input parameters and runs the request ad action on
      * the UI thread.
      *
-     * @param inputs The JSONArray representing input parameters.  This function
-     *        expects the first object in the array to be a JSONObject with the
-     *        input parameters.
+     * @param options The JSONObject carrying options for the banner.
      * @return A PluginResult representing whether or not an ad was requested
      *         succcessfully.  Listen for onReceiveAd() and onFailedToReceiveAd()
      *         callbacks to see if an ad was successfully retrieved.
@@ -371,9 +369,7 @@ public class AdMob extends CordovaPlugin {
      * Parses the show ad input parameters and runs the show ad action on
      * the UI thread.
      *
-     * @param inputs The JSONArray representing input parameters.  This function
-     *        expects the first object in the array to be a JSONObject with the
-     *        input parameters.
+     * @param show indicates to show the ad or not.
      * @return A PluginResult representing whether or not an ad was requested
      *         succcessfully.  Listen for onReceiveAd() and onFailedToReceiveAd()
      *         callbacks to see if an ad was successfully retrieved.
@@ -481,7 +477,6 @@ public class AdMob extends CordovaPlugin {
         return null;
     }
 
-
     /**
      * This class implements the AdMob ad listener events.  It forwards the events
      * to the JavaScript layer.  To listen for these events, use:
@@ -493,43 +488,80 @@ public class AdMob extends CordovaPlugin {
      * document.addEventListener('onLeaveToAd', function());
      */
     public class BasicListener extends AdListener {
+        private Object view;
+
+        public BasicListener(Object view) {
+            this.view = view;
+        }
+
+        protected String getAdNetworkName() {
+            if (view == null) {
+                return "Unknown";
+            }
+
+            String adClassName = view instanceof AdView ?
+                    ((AdView)view).getMediationAdapterClassName() :
+                    ((InterstitialAd)view).getMediationAdapterClassName();
+            return adClassName == null ? "AdMob" :
+                    (adClassName.contains("Flurry") ? "Flurry" : "AdMob");
+        }
+
         @Override
         public void onAdFailedToLoad(int errorCode) {
             webView.loadUrl(String.format(
-                "javascript:cordova.fireDocumentEvent('onFailedToReceiveAd', { 'error': %d, 'reason':'%s' });",
-                errorCode, getErrorReason(errorCode)));
+                "javascript:cordova.fireDocumentEvent('onFailedToReceiveAd', " +
+                "{ 'error': %d, 'reason':'%s', 'network': '%s' });",
+                errorCode, getErrorReason(errorCode), getAdNetworkName()));
         }
 
         @Override
         public void onAdLeftApplication() {
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onLeaveToAd');");
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onLeaveToAd', " +
+                    "{ 'network': '%s'});", getAdNetworkName()));
         }
     }
 
     private class BannerListener extends BasicListener {
+        public BannerListener(Object view) {
+            super(view);
+        }
+
         @Override
         public void onAdLoaded() {
-            Log.w("AdMob", "BannerAdLoaded, network classname=" + adView.getMediationAdapterClassName());
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onReceiveAd');");
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onReceiveAd', " +
+                            "{ 'network': '%s'});", getAdNetworkName()));
         }
 
         @Override
         public void onAdOpened() {
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onPresentAd');");
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onPresentAd', " +
+                            "{ 'network': '%s'});", getAdNetworkName()));
         }
 
         @Override
         public void onAdClosed() {
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onDismissAd');");
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onDismissAd', " +
+                            "{ 'network': '%s'});", getAdNetworkName()));
         }
 
     }
 
     private class InterstitialListener extends BasicListener {
+        public InterstitialListener(Object view) {
+            super(view);
+        }
+
         @Override
         public void onAdLoaded() {
             Log.w("AdMob", "InterstitialAdLoaded");
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onReceiveInterstitialAd');");
+            interstitialAd.getMediationAdapterClassName();
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onReceiveInterstitialAd', " +
+                            "{ 'network': '%s'});", getAdNetworkName()));
 
             if(autoShowInterstitial) {
                 executeShowInterstitialAd(true, null);
@@ -541,12 +573,16 @@ public class AdMob extends CordovaPlugin {
 
         @Override
         public void onAdOpened() {
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onPresentInterstitialAd');");
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onPresentInterstitialAd', " +
+                            "{ 'network': '%s'});", getAdNetworkName()));
         }
 
         @Override
         public void onAdClosed() {
-            webView.loadUrl("javascript:cordova.fireDocumentEvent('onDismissInterstitialAd');");
+            webView.loadUrl(String.format(
+                    "javascript:cordova.fireDocumentEvent('onDismissInterstitialAd', " +
+                            "{ 'network': '%s'});", getAdNetworkName()));
             interstitialAd = null;
         }
 
