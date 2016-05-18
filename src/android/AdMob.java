@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
-import com.google.ads.mediation.flurry.FlurryAdapter;
 import com.google.android.gms.ads.*;
 import com.google.android.gms.ads.mediation.admob.AdMobExtras;
 import com.google.android.gms.common.ConnectionResult;
@@ -293,7 +292,6 @@ public class AdMob extends CordovaPlugin {
 
         Bundle bundle = new Bundle();
         bundle.putInt("cordova", 1);
-        //bundle.putBoolean(FlurryAdapter.SERVER_PARAM_LOG_ENABLED, true);
         if(adExtras != null) {
             Iterator<String> it = adExtras.keys();
             while (it.hasNext()) {
@@ -307,7 +305,6 @@ public class AdMob extends CordovaPlugin {
         }
         AdMobExtras adextras = new AdMobExtras(bundle);
         request_builder = request_builder.addNetworkExtras( adextras );
-        //request_builder.addNetworkExtrasBundle(FlurryAdapter.class, bundle);
 
         AdRequest request = request_builder.build();
 
