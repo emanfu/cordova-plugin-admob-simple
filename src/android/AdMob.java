@@ -496,11 +496,20 @@ public class AdMob extends CordovaPlugin {
                 return "Unknown";
             }
 
+            String network = "AdMob";
             String adClassName = view instanceof AdView ?
                     ((AdView)view).getMediationAdapterClassName() :
                     ((InterstitialAd)view).getMediationAdapterClassName();
-            return adClassName == null ? "AdMob" :
-                    (adClassName.contains("Flurry") ? "Flurry" : "AdMob");
+            if (adClassName != null) {
+                if (adClassName.contains("Flurry")) {
+                    network = "Flurry";
+                } else if (adClassName.contains("Millennial")) {
+                    network = "Millennial";
+                } else if (adClassName.contains("Appfireworks")) {
+                    network = "LeadBolt";
+                }
+            }
+            return network;
         }
 
         @Override
@@ -555,7 +564,6 @@ public class AdMob extends CordovaPlugin {
         @Override
         public void onAdLoaded() {
             Log.w("AdMob", "InterstitialAdLoaded");
-            interstitialAd.getMediationAdapterClassName();
             webView.loadUrl(String.format(
                     "javascript:cordova.fireDocumentEvent('onReceiveInterstitialAd', " +
                             "{ 'network': '%s'});", getAdNetworkName()));
@@ -669,11 +677,12 @@ public class AdMob extends CordovaPlugin {
         return errorReason;
     }
 
-    private String getTempInterstitial(){
-    	return "ca-app-pub-9606049518741138/6843800409";
+    private String getTempInterstitial() {
+        return "ca-app-pub-6611808811429075/5227124540";
     }
+
     private String getTempBanner(){
-    	return "ca-app-pub-9606049518741138/5367067208";
+    	return "ca-app-pub-6611808811429075/3750391341";
     }
     
     public static final String md5(final String s) {

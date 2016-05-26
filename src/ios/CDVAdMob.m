@@ -5,7 +5,6 @@
 #import <GoogleMobileAds/GADExtras.h>
 
 #import "MainViewController.h"
-#import "Flurry.h"
 
 @interface CDVAdMob()
 
@@ -95,9 +94,6 @@
          name:UIDeviceOrientationDidChangeNotification
 
          object:nil];
-
-        [Flurry setDebugLogEnabled:YES];
-        [Flurry setLogLevel:FlurryLogLevelAll];
 
     }
 
@@ -822,6 +818,10 @@
     NSString *network = @"AdMob";
     if ([adClassName containsString:@"Flurry"]) {
         network = @"Flurry";
+    } else if ([adClassName containsString:@"Millennial"]) {
+        network = @"Millennial";
+    } else if ([adClassName containsString:@"Appfireworks"]) {
+        network = @"LeadBolt";
     }
     return network;
 }
