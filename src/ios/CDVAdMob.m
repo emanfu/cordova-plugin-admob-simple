@@ -313,7 +313,15 @@
 
     } else {
 
-        [self __showInterstitial:YES];
+        NSArray* arguments = command.arguments;
+        BOOL show = YES;
+        NSUInteger argc = [arguments count];
+        if (argc >= 1) {
+            NSString* showValue = [arguments objectAtIndex:0];
+            show = showValue ? [showValue boolValue] : YES;
+        }
+
+        [self __showInterstitial:show];
 
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
 
@@ -691,6 +699,13 @@
 {
 
     NSLog(@"__showInterstitial");
+    
+    if (!show) {
+        if (self.interstitialView) {
+            [self.viewController dismissViewControllerAnimated:NO completion:NULL];
+        }
+        return;
+    }
 
     if (! self.interstitialView){
 
@@ -701,8 +716,6 @@
     if(self.interstitialView && self.interstitialView.isReady) {
 
         [self.interstitialView presentFromRootViewController:self.viewController];
-
-    } else {
 
     }
 
