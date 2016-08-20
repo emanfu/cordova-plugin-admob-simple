@@ -1,5 +1,6 @@
 package com.cupertino.cordova.plugin;
 
+import android.app.Activity;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
@@ -19,9 +20,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.lang.reflect.Field;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -450,7 +453,52 @@ public class AdMob extends CordovaPlugin {
         return null;
     }
 
+    public static Activity getRunningActivity() {
+        try {
+            Class activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread")
+                    .invoke(null);
+            Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
+            activitiesField.setAccessible(true);
+            Map activities = (Map) activitiesField.get(activityThread);
+            for (Object activityRecord : activities.values()) {
+                Class activityRecordClass = activityRecord.getClass();
+                Field pausedField = activityRecordClass.getDeclaredField("paused");
+                pausedField.setAccessible(true);
+                if (!pausedField.getBoolean(activityRecord)) {
+                    Field activityField = activityRecordClass.getDeclaredField("activity");
+                    activityField.setAccessible(true);
+                    return (Activity) activityField.get(activityRecord);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return null;
+    }
+
     private PluginResult executeShowInterstitialAd(final boolean show, final CallbackContext callbackContext) {
+
+        if (!show) {
+            if (interstitialAd != null) {
+                // emulate a back key press to dismiss the interstitial ad
+                Log.d("Interstitial", "auto-close triggered");
+                cordova.getActivity().runOnUiThread(new Runnable(){
+                    @Override
+                    public void run() {
+                        // the interstitial ad is running on a different activity. we need
+                        // to find it to call onBackPressed();
+                        Activity topAct =  getRunningActivity();
+                        if (topAct != null) {
+                            topAct.onBackPressed();
+                        }
+                    }
+                });
+            }
+            if(callbackContext != null) callbackContext.success();
+            return null;
+        }
 
         if(interstitialAd == null) {
             return new PluginResult(Status.ERROR, "interstitialAd is null, call createInterstitialView first.");
